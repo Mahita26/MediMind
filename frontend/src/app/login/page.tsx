@@ -1,91 +1,187 @@
-'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Activity } from 'lucide-react';
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Activity, Stethoscope, User } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { apiLogin, apiRegister } from "@/lib/api";
+
+type Tab = "login" | "register";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { login } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [tab, setTab] = useState<Tab>("login");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Shared fields
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  // Register-only fields
+  const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState<"doctor" | "patient">("doctor");
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Mock authentication for hackathon demo
-    setTimeout(() => {
-      // Typically we'd save a JWT here
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('auth_token', 'mock-jwt-token-123');
+    setError(null);
+
+    try {
+      let data;
+      if (tab === "login") {
+        data = await apiLogin({ email, password });
+      } else {
+        data = await apiRegister({ email, password, full_name: fullName, role });
       }
-      router.push('/dashboard');
-    }, 1000);
+
+      login(data.access_token, {
+        user_id: data.user_id,
+        full_name: data.full_name,
+        role: data.role as "doctor" | "patient",
+      });
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-xl border border-gray-100">
-        <div>
-          <Activity className="mx-auto h-12 w-12 text-medical-blue" />
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to MediMind
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link href="/login" className="font-medium text-medical-blue hover:text-medical-dark">
-              create a new hospital account
-            </Link>
-          </p>
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50/30 py-12 px-4">
+      <div className="max-w-md w-full">
+        {/* Logo + Title */}
+        <div className="text-center mb-8">
+          <div className="inline-flex h-14 w-14 bg-gradient-to-br from-medical-blue to-cyan-500 rounded-2xl items-center justify-center shadow-lg shadow-medical-blue/30 mb-4">
+            <Activity className="h-8 w-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-extrabold text-gray-900">MediMind</h1>
+          <p className="text-gray-500 mt-1 text-sm">AI-Powered Radiology Platform</p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          <div className="rounded-md shadow-sm space-y-4">
+
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Tabs */}
+          <div className="flex border-b border-gray-100">
+            {(["login", "register"] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => { setTab(t); setError(null); }}
+                className={`flex-1 py-4 text-sm font-semibold transition-colors ${
+                  tab === t
+                    ? "text-medical-blue border-b-2 border-medical-blue bg-blue-50/50"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {t === "login" ? "Sign In" : "Create Account"}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-8 space-y-5">
+            {/* Full name (register only) */}
+            {tab === "register" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Dr. Jane Smith"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-medical-blue/30 focus:border-medical-blue transition-all"
+                />
+              </div>
+            )}
+
+            {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">
-                Email address
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Email Address
               </label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 required
-                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 rounded-xl placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-medical-blue focus:border-medical-blue focus:z-10 sm:text-sm"
-                placeholder="doctor@hospital.com"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="doctor@hospital.com"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-medical-blue/30 focus:border-medical-blue transition-all"
               />
             </div>
+
+            {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Password
               </label>
               <input
                 id="password"
-                name="password"
                 type="password"
                 required
-                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 rounded-xl placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-medical-blue focus:border-medical-blue focus:z-10 sm:text-sm"
-                placeholder="••••••••"
+                minLength={6}
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-medical-blue/30 focus:border-medical-blue transition-all"
               />
             </div>
-          </div>
 
-          <div>
+            {/* Role selector (register only) */}
+            {tab === "register" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  I am a…
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["doctor", "patient"] as const).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRole(r)}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                        role === r
+                          ? "border-medical-blue bg-blue-50 text-medical-blue"
+                          : "border-gray-200 text-gray-500 hover:border-gray-300"
+                      }`}
+                    >
+                      {r === "doctor" ? (
+                        <Stethoscope className="h-6 w-6" />
+                      ) : (
+                        <User className="h-6 w-6" />
+                      )}
+                      <span className="text-sm font-semibold capitalize">{r}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Error */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
+                {error}
+              </div>
+            )}
+
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-medical-blue hover:bg-medical-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-medical-blue transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full bg-medical-blue hover:bg-medical-dark disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md shadow-medical-blue/30"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : tab === "login" ? (
+                "Sign In"
               ) : (
-                'Sign in'
+                "Create Account"
               )}
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );
