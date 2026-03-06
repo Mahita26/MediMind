@@ -1,14 +1,39 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
+import re
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 class RegisterRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
     full_name: str
     role: str  # "doctor" or "patient"
+
+    @field_validator("email")
+    @classmethod
+    def email_must_be_valid(cls, v: str) -> str:
+        # Validate email format and preferably use real email domains
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', v):
+            raise ValueError("Invalid email format")
+        # Reject temporary/fake email providers (optional - add more if needed)
+        fake_domains = ['test.com', 'fake.com', 'example.com', 'tempmail.com', 'guerrillamail.com']
+        domain = v.split('@')[1].lower()
+        if domain in fake_domains:
+            raise ValueError("Please use a real email address")
+        return v
+    
+    @field_validator("password")
+    @classmethod
+    def password_must_be_strong(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+        return v
 
     @field_validator("role")
     @classmethod
@@ -19,7 +44,7 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 
